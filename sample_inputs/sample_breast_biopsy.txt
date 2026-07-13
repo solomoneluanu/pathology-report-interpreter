@@ -1,0 +1,13 @@
+SURGICAL PATHOLOGY REPORT
+
+Specimen: Left breast, core needle biopsy.
+
+Clinical history: 52-year-old female with a 1.8 cm mass on mammography, left breast, upper outer quadrant.
+
+Microscopic description: Sections demonstrate an invasive ductal carcinoma, moderately differentiated (Nottingham grade 2 of 3). Lymphovascular invasion is not identified. There is no necrosis. Background breast tissue shows fibrocystic changes and usual ductal hyperplasia without atypia.
+
+Immunohistochemistry: Estrogen receptor positive (95%), progesterone receptor positive (80%), HER2 negative (score 1+). Ki-67 proliferation index approximately 15%.
+
+Diagnosis: Left breast, core needle biopsy - invasive ductal carcinoma, moderately differentiated, ER positive, PR positive, HER2 negative.
+
+Comment: Findings to be correlated with imaging. Surgical consultation recommended.
