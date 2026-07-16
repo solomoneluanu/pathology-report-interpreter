@@ -3,13 +3,13 @@ PathPal - Pathology Report Interpreter for Patients
 ====================================================
 An educational tool that helps patients understand pathology reports by:
   1. Highlighting medical terms found in the report (biomedical NER)
-  2. Generating a plain-language summary (medical summarization model)
+  2. Narrating a plain-language explanation, built from detected entities and
+     a curated glossary (not a generative model, so nothing is fabricated)
   3. Explaining common pathology jargon with a built-in glossary
   4. (Multimodal) Accepting a photo/scan of a printed report via OCR
 
 Models used (Hugging Face Hub):
   - d4data/biomedical-ner-all      -> token classification (NER)
-  - sshleifer/distilbart-cnn-12-6  -> BART-based summarization
 
 DISCLAIMER: This app is for educational purposes only. It is NOT a medical
 device and does NOT provide medical advice. Patients should always discuss
@@ -24,7 +24,7 @@ import re
 from pathlib import Path
 
 import gradio as gr
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
+from transformers import pipeline
 
 # ---------------------------------------------------------------------------
 # 1. Load models once at startup (small models chosen so the free CPU tier
@@ -37,24 +37,36 @@ ner_pipeline = pipeline(
     aggregation_strategy="simple",  # merge sub-word tokens into full entities
 )
 
-print("Loading medical summarization model...")
-SUMMARIZATION_MODEL = "sshleifer/distilbart-cnn-12-6"
-summarizer_tokenizer = AutoTokenizer.from_pretrained(SUMMARIZATION_MODEL)
-summarizer_model = AutoModelForSeq2SeqLM.from_pretrained(SUMMARIZATION_MODEL)
-
 # ---------------------------------------------------------------------------
 # 2. Load the plain-language glossary (curated JSON bundled with the app).
 #    This part is deterministic: it never depends on model behavior.
 # ---------------------------------------------------------------------------
 GLOSSARY_PATH = Path(__file__).parent / "glossary.json"
 with open(GLOSSARY_PATH, encoding="utf-8") as f:
-    GLOSSARY: dict[str, str] = json.load(f)
+    # Most entries are a plain definition string. A term may instead be
+    # {"definition": ..., "short": ...} when it has a curated short gloss.
+    GLOSSARY: dict[str, str | dict] = json.load(f)
 
 # Pre-compile a regex per glossary term for whole-word, case-insensitive match.
 GLOSSARY_PATTERNS = {
     term: re.compile(rf"\b{re.escape(term)}\b", flags=re.IGNORECASE)
     for term in GLOSSARY
 }
+
+
+def glossary_definition(term: str) -> str:
+    """Full definition text for a glossary term, regardless of entry shape."""
+    entry = GLOSSARY[term]
+    return entry["definition"] if isinstance(entry, dict) else entry
+
+
+def glossary_short_gloss(term: str) -> str:
+    """Short parenthetical gloss for a term: the curated 'short' field if
+    present, otherwise the first sentence of the full definition."""
+    entry = GLOSSARY[term]
+    if isinstance(entry, dict) and entry.get("short"):
+        return entry["short"].rstrip(".!? ")
+    return re.split(r"(?<=[.!?])\s+", glossary_definition(term).strip())[0].rstrip(".!? ")
 
 # Friendly display names for the NER entity groups we care about most.
 ENTITY_LABELS = {
@@ -69,60 +81,6 @@ ENTITY_LABELS = {
     "Severity": "Severity",
 }
 
-# Report boilerplate stripped before summarization only (NER still sees the
-# original full text, since these labels/headers can themselves be useful
-# structural cues for entity extraction).
-REPORT_TITLE_PATTERN = re.compile(
-    r"^\s*SURGICAL PATHOLOGY REPORT\s*$", flags=re.IGNORECASE | re.MULTILINE
-)
-SECTION_LABELS = [
-    "Specimen",
-    "Clinical history",
-    "Gross description",
-    "Microscopic description",
-    "Diagnosis",
-    "Comment",
-]
-SECTION_LABEL_PATTERN = re.compile(
-    r"^\s*(" + "|".join(re.escape(label) for label in SECTION_LABELS) + r"):\s*",
-    flags=re.IGNORECASE | re.MULTILINE,
-)
-
-# Placed first in the summarizer input so the diagnosis survives even with a
-# short max_length, instead of getting crowded out by earlier sections.
-PRIORITY_SECTION_ORDER = ["Diagnosis", "Microscopic description"]
-
-
-def preprocess_for_summary(report_text: str) -> str:
-    """Strip title/labels, keeping content, with diagnosis + microscopic
-    findings moved to the front and the remaining sections following."""
-    text = REPORT_TITLE_PATTERN.sub("", report_text)
-
-    matches = list(SECTION_LABEL_PATTERN.finditer(text))
-    if not matches:
-        return text.strip()
-
-    preamble = text[: matches[0].start()].strip()
-    sections = []
-    for i, match in enumerate(matches):
-        label = match.group(1).strip().lower()
-        start = match.end()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        sections.append((label, text[start:end].strip()))
-
-    priority_keys = [label.lower() for label in PRIORITY_SECTION_ORDER]
-    priority = [
-        content
-        for key in priority_keys
-        for label, content in sections
-        if label == key
-    ]
-    remaining = [content for label, content in sections if label not in priority_keys]
-
-    ordered_parts = ([preamble] if preamble else []) + priority + remaining
-    return "\n".join(part for part in ordered_parts if part)
-
-
 DISCLAIMER_MD = (
     "> ⚠️ **Important:** This tool is for **education only**. It is not a "
     "medical device, it can make mistakes, and it does not replace your "
@@ -134,10 +92,8 @@ DISCLAIMER_MD = (
 # ---------------------------------------------------------------------------
 # 3. Core analysis functions
 # ---------------------------------------------------------------------------
-def highlight_entities(report_text: str):
-    """Run biomedical NER and return spans for gr.HighlightedText."""
-    entities = ner_pipeline(report_text)
-
+def highlight_entities(report_text: str, entities: list):
+    """Build spans for gr.HighlightedText from precomputed NER entities."""
     spans = []
     cursor = 0
     # Sort by start position and rebuild the text with labeled spans.
@@ -155,33 +111,12 @@ def highlight_entities(report_text: str):
     return spans
 
 
-def summarize_report(report_text: str) -> str:
-    """Generate a short plain-language summary of the report."""
-    clean_text = preprocess_for_summary(report_text)
-
-    # The model has an input limit; truncate very long reports defensively.
-    words = clean_text.split()
-    if len(words) > 400:
-        clean_text = " ".join(words[:400])
-
-    n_words = len(clean_text.split())
-    inputs = summarizer_tokenizer(clean_text, return_tensors="pt", truncation=True)
-    output_ids = summarizer_model.generate(
-        **inputs,
-        max_length=min(130, max(30, n_words // 2)),  # ~half the input, so it condenses
-        min_length=45,
-        no_repeat_ngram_size=3,
-        do_sample=False,
-    )
-    return summarizer_tokenizer.decode(output_ids[0], skip_special_tokens=True)
-
-
 def build_glossary_table(report_text: str) -> str:
     """Find glossary terms present in the report and explain them in lay terms."""
     rows = []
     for term, pattern in GLOSSARY_PATTERNS.items():
         if pattern.search(report_text):
-            rows.append(f"| **{term.title()}** | {GLOSSARY[term]} |")
+            rows.append(f"| **{term.title()}** | {glossary_definition(term)} |")
 
     if not rows:
         return (
@@ -190,6 +125,118 @@ def build_glossary_table(report_text: str) -> str:
         )
     header = "| Term in your report | What it means in plain English |\n|---|---|\n"
     return header + "\n".join(rows)
+
+
+# Multi-word entries first (by word count, then char length) so overlapping
+# phrases like "invasive ductal carcinoma" resolve to one combined term
+# instead of matching each component word ("invasive", "ductal", "carcinoma").
+GLOSSARY_TERMS_BY_SPECIFICITY = sorted(
+    GLOSSARY, key=lambda term: (-len(term.split()), -len(term))
+)
+
+SPECIMEN_TERMS = ["resection", "excision", "biopsy", "specimen"]
+DIFFERENTIATION_TERMS = [
+    "poorly differentiated",
+    "moderately differentiated",
+    "well differentiated",
+    "differentiated",
+]
+RECEPTOR_TERMS = ["estrogen receptor", "progesterone receptor", "her2"]
+RECEPTOR_LABELS = {
+    "estrogen receptor": "estrogen receptor",
+    "progesterone receptor": "progesterone receptor",
+    "her2": "HER2",
+}
+
+
+def _first_entity_text(entities: list, report_text: str, group: str) -> str | None:
+    """Text of the earliest-occurring entity in the given NER group, or None."""
+    matches = [e for e in entities if e["entity_group"] == group]
+    if not matches:
+        return None
+    first = min(matches, key=lambda e: e["start"])
+    return report_text[first["start"] : first["end"]].strip()
+
+
+def _find_glossary_term(text: str) -> str | None:
+    """Most specific glossary term (multi-word first) found in text, or None."""
+    for term in GLOSSARY_TERMS_BY_SPECIFICITY:
+        if GLOSSARY_PATTERNS[term].search(text):
+            return term
+    return None
+
+
+def _lowercase_first(text: str) -> str:
+    return text[0].lower() + text[1:] if text else text
+
+
+def narrate_report(report_text: str, entities: list) -> str:
+    """Build a flowing plain-language paragraph from detected NER entities and
+    glossary terms. Every sentence is grounded in something actually found in
+    the report; nothing is stated unless backed by an entity or a matched
+    glossary term."""
+    sentences = []
+
+    # 1. Opening: specimen/site, if detected.
+    site = _first_entity_text(entities, report_text, "Biological_structure")
+    procedure = _first_entity_text(
+        entities, report_text, "Diagnostic_procedure"
+    ) or _first_entity_text(entities, report_text, "Therapeutic_procedure")
+    specimen_term = next(
+        (t for t in SPECIMEN_TERMS if GLOSSARY_PATTERNS[t].search(report_text)), None
+    )
+    procedure_phrase = procedure.lower() if procedure else specimen_term
+    if procedure_phrase and site:
+        sentences.append(f"This report is based on a {procedure_phrase} of the {site.lower()}.")
+    elif site:
+        sentences.append(f"This report concerns tissue from the {site.lower()}.")
+    elif procedure_phrase:
+        sentences.append(f"This report is based on a {procedure_phrase}.")
+
+    # 2. Main diagnosis, with its glossary meaning woven into the sentence.
+    diagnosis = _first_entity_text(entities, report_text, "Disease_disorder")
+    if diagnosis:
+        term = _find_glossary_term(diagnosis) or _find_glossary_term(report_text)
+        if term:
+            sentences.append(
+                f"The main finding is {diagnosis.lower()}, which means "
+                f"{_lowercase_first(glossary_short_gloss(term))}."
+            )
+        else:
+            sentences.append(f"The main finding is {diagnosis.lower()}.")
+
+    # 3. Grade / differentiation, in plain terms.
+    diff_term = next(
+        (t for t in DIFFERENTIATION_TERMS if GLOSSARY_PATTERNS[t].search(report_text)), None
+    )
+    if diff_term:
+        sentences.append(
+            f"The cells are described as {diff_term}, which means "
+            f"{_lowercase_first(glossary_short_gloss(diff_term))}."
+        )
+
+    # 4. Receptor status, in plain terms. Each clause names its receptor so
+    # near-identical glossary wording (e.g. ER vs. PR) doesn't read as a
+    # repeated, unattributed fragment.
+    receptor_clauses = [
+        f"{RECEPTOR_LABELS[t]} testing looks for {_lowercase_first(glossary_short_gloss(t))}"
+        for t in RECEPTOR_TERMS
+        if GLOSSARY_PATTERNS[t].search(report_text)
+    ]
+    if receptor_clauses:
+        if len(receptor_clauses) == 1:
+            joined = receptor_clauses[0]
+        else:
+            joined = ", ".join(receptor_clauses[:-1]) + ", and " + receptor_clauses[-1]
+        sentences.append(f"The report also checked receptor status: {joined}.")
+
+    # 5. Closing reminder -- general advice, not a claim about the report.
+    sentences.append(
+        "As always, share this report with your doctor, who can explain what "
+        "it means for your specific care."
+    )
+
+    return " ".join(sentences)
 
 
 def analyze_report(report_text: str):
@@ -203,10 +250,11 @@ def analyze_report(report_text: str):
             "Please paste the full report text."
         )
 
-    highlighted = highlight_entities(report_text)
-    summary = summarize_report(report_text)
+    entities = ner_pipeline(report_text)
+    highlighted = highlight_entities(report_text, entities)
+    narration = narrate_report(report_text, entities)
     glossary_md = build_glossary_table(report_text)
-    return highlighted, summary, glossary_md
+    return highlighted, narration, glossary_md
 
 
 def ocr_report_photo(image) -> str:
@@ -252,7 +300,7 @@ with gr.Blocks(theme=THEME, css=CUSTOM_CSS, title="PathPal - Pathology Report In
     gr.Markdown(
         "# 🔬 PathPal — Pathology Report Interpreter\n"
         "Paste your pathology report (or upload a photo of it) and PathPal will "
-        "**highlight the medical terms**, give you a **plain-language summary**, "
+        "**highlight the medical terms**, give you a **plain-language explanation**, "
         "and **explain common jargon** — so you can walk into your next "
         "appointment with better questions.",
         elem_id="app-title",
@@ -291,7 +339,7 @@ with gr.Blocks(theme=THEME, css=CUSTOM_CSS, title="PathPal - Pathology Report In
             )
         with gr.Column(scale=2):
             summary_output = gr.Textbox(
-                label="Plain-language summary (AI-generated — may contain errors)",
+                label="What this report means (plain-language explanation)",
                 lines=6,
             )
     glossary_output = gr.Markdown(label="Glossary of terms found in your report")
@@ -318,9 +366,9 @@ with gr.Blocks(theme=THEME, css=CUSTOM_CSS, title="PathPal - Pathology Report In
     gr.Markdown(
         "---\n*Models: [d4data/biomedical-ner-all]"
         "(https://huggingface.co/d4data/biomedical-ner-all) · "
-        "[Falconsai/medical_summarization]"
-        "(https://huggingface.co/Falconsai/medical_summarization) · "
-        "OCR via Tesseract. Built with 🤗 Transformers and Gradio.*"
+        "plain-language narration is rule-based (entities + curated glossary, "
+        "no generative model) · OCR via Tesseract. Built with 🤗 Transformers "
+        "and Gradio.*"
     )
 
 if __name__ == "__main__":

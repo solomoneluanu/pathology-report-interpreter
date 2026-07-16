@@ -1,6 +1,5 @@
 gradio>=5.0.0
 transformers>=4.44.0
 torch>=2.2.0
-sentencepiece
 pytesseract
 Pillow

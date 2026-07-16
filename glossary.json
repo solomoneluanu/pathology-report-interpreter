@@ -1,7 +1,18 @@
 {
   "benign": "Not cancer. Benign growths do not spread to other parts of the body.",
   "malignant": "Cancerous. Malignant cells can grow into nearby tissue and may spread elsewhere in the body.",
-  "carcinoma": "A cancer that starts in the cells lining organs or skin. It is the most common type of cancer.",
+  "carcinoma": {
+    "definition": "A cancer that starts in the cells lining organs or skin. It is the most common type of cancer.",
+    "short": "A cancer that starts in the skin or the lining of organs."
+  },
+  "invasive ductal carcinoma": {
+    "definition": "The most common type of breast cancer. It starts in a milk duct and has grown beyond it into the surrounding breast tissue.",
+    "short": "A common breast cancer that has spread beyond the milk ducts into nearby tissue."
+  },
+  "basal cell carcinoma": {
+    "definition": "The most common type of skin cancer. It starts in the deepest layer of the skin and usually grows slowly without spreading.",
+    "short": "A common, usually slow-growing skin cancer."
+  },
   "adenocarcinoma": "A cancer that starts in gland cells — cells that make mucus or other fluids (common in colon, breast, lung, and prostate).",
   "sarcoma": "A cancer that starts in bone, muscle, fat, or other connective tissue.",
   "lymphoma": "A cancer that starts in the lymphatic system, part of the body's germ-fighting network.",
@@ -16,27 +27,49 @@
   "histology": "The study of tissue under a microscope. 'Histologic type' describes what kind of cells were seen.",
   "cytology": "The study of individual cells (rather than whole tissue) under a microscope.",
   "pathologist": "The doctor who examines tissue under a microscope and writes the pathology report.",
+  "margin": {
+    "definition": "The edge of the tissue that was removed. Doctors check whether abnormal cells reach this edge.",
+    "short": "The edge of the removed tissue."
+  },
   "margins": "The edges of the tissue that was removed. Doctors check whether abnormal cells reach the edge.",
   "clear margins": "No cancer cells were seen at the edges of the removed tissue — a good sign that the abnormal area was fully removed.",
   "negative margins": "Same as clear margins: no cancer cells at the edge of what was removed.",
   "positive margins": "Cancer cells were found at the edge of the removed tissue, which may mean some abnormal cells were left behind. More treatment may be discussed.",
-  "in situ": "Latin for 'in place.' The abnormal cells are only in the layer where they started and have not grown into deeper tissue.",
-  "invasive": "The abnormal cells have grown beyond the layer where they started into nearby tissue.",
+  "in situ": {
+    "definition": "Latin for 'in place.' The abnormal cells are only in the layer where they started and have not grown into deeper tissue.",
+    "short": "The abnormal cells have not spread beyond where they started."
+  },
+  "invasive": {
+    "definition": "The abnormal cells have grown beyond the layer where they started into nearby tissue.",
+    "short": "The cancer has grown into nearby tissue."
+  },
   "infiltrating": "Another word for invasive — the cells are growing into surrounding tissue.",
   "metastasis": "The spread of cancer from where it started to another part of the body.",
   "metastatic": "Describes cancer that has spread from its original location to another part of the body.",
-  "differentiated": "How much the cancer cells look like normal cells. 'Well differentiated' cells look more normal and often grow more slowly; 'poorly differentiated' cells look very abnormal and may grow faster.",
+  "differentiated": {
+    "definition": "How much the cancer cells look like normal cells. 'Well differentiated' cells look more normal and often grow more slowly; 'poorly differentiated' cells look very abnormal and may grow faster.",
+    "short": "How much the cancer cells resemble normal cells."
+  },
   "well differentiated": "The cells look a lot like normal cells. These cancers often grow and spread more slowly (low grade).",
-  "moderately differentiated": "The cells look somewhat abnormal — in between low grade and high grade.",
+  "moderately differentiated": {
+    "definition": "The cells look somewhat abnormal — in between low grade and high grade.",
+    "short": "The cells look somewhat abnormal, in between low and high grade."
+  },
   "poorly differentiated": "The cells look very different from normal cells. These cancers may grow and spread more quickly (high grade).",
   "grade": "A score for how abnormal the cells look under the microscope, which hints at how fast the cancer may grow. Lower grade usually means slower-growing.",
   "stage": "How far a cancer has grown or spread in the body. Staging usually combines the pathology report with scans and other tests.",
-  "dysplasia": "Cells that look abnormal but are not cancer. Depending on the degree (mild, moderate, severe), they may need monitoring or removal.",
+  "dysplasia": {
+    "definition": "Cells that look abnormal but are not cancer. Depending on the degree (mild, moderate, severe), they may need monitoring or removal.",
+    "short": "Abnormal-looking cells that are not cancer."
+  },
   "atypia": "Cells that look slightly abnormal under the microscope. Atypia is not cancer by itself.",
   "atypical": "Not entirely normal in appearance. Atypical cells are watched closely but are not automatically cancer.",
   "hyperplasia": "An increased number of normal-looking cells. It is not cancer, though some types can raise future risk.",
   "polyp": "A growth that sticks out from the lining of an organ such as the colon. Most polyps are benign, but some types can turn into cancer over time.",
-  "adenoma": "A benign (non-cancerous) tumor that starts in gland cells. Some adenomas, like colon adenomas, are removed because they can become cancer later.",
+  "adenoma": {
+    "definition": "A benign (non-cancerous) tumor that starts in gland cells. Some adenomas, like colon adenomas, are removed because they can become cancer later.",
+    "short": "A non-cancerous tumor that starts in gland cells."
+  },
   "cyst": "A closed sac that may contain fluid or other material. Most cysts are benign.",
   "fibrosis": "Thickening or scarring of tissue.",
   "necrosis": "Dead tissue or cells. In tumors, it often means the tumor outgrew its blood supply.",
@@ -56,7 +89,10 @@
   "progesterone receptor": "A protein some breast cancer cells have. 'PR-positive' cancers may respond to hormone-blocking treatments.",
   "her2": "A protein that can make some cancer cells grow faster. HER2-positive cancers can be treated with targeted drugs.",
   "carcinoma in situ": "Very early cancer that is still only in the layer of cells where it began and has not spread deeper.",
-  "ductal": "Related to the ducts (small tubes) of an organ, such as milk ducts in the breast.",
+  "ductal": {
+    "definition": "Related to the ducts (small tubes) of an organ, such as milk ducts in the breast.",
+    "short": "Related to the milk ducts in the breast."
+  },
   "lobular": "Related to the lobules — the small glands, for example the milk-producing glands of the breast.",
   "squamous": "Describes flat cells that line surfaces like the skin, mouth, throat, and cervix.",
   "basal cell": "A type of cell in the deepest layer of the skin. Basal cell carcinoma is a common, usually slow-growing skin cancer.",
