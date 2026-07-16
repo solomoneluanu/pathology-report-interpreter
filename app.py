@@ -134,7 +134,6 @@ GLOSSARY_TERMS_BY_SPECIFICITY = sorted(
     GLOSSARY, key=lambda term: (-len(term.split()), -len(term))
 )
 
-SPECIMEN_TERMS = ["resection", "excision", "biopsy", "specimen"]
 DIFFERENTIATION_TERMS = [
     "poorly differentiated",
     "moderately differentiated",
@@ -170,6 +169,41 @@ def _lowercase_first(text: str) -> str:
     return text[0].lower() + text[1:] if text else text
 
 
+DIAGNOSIS_SECTION_LABELS = ["Diagnosis", "Final diagnosis", "Impression"]
+SPECIMEN_SECTION_LABELS = ["Specimen"]
+
+
+def _extract_section_text(report_text: str, labels: list) -> str | None:
+    """Deterministically extract a labeled section's content (e.g.
+    "Diagnosis:" or "Specimen:"), independent of the NER model. Tries labels
+    in priority order and stops at the next blank line, the next apparent
+    section header, or the end of the report."""
+    for label in labels:
+        pattern = re.compile(
+            rf"^[ \t]*{re.escape(label)}[ \t]*:[ \t]*(.+?)"
+            r"(?=\n[ \t]*\n|\n[ \t]*[A-Z][A-Za-z /]{2,40}:|\Z)",
+            flags=re.IGNORECASE | re.MULTILINE | re.DOTALL,
+        )
+        match = pattern.search(report_text)
+        if match:
+            text = re.sub(r"\s+", " ", match.group(1)).strip()
+            if text:
+                return text
+    return None
+
+
+def _extract_diagnosis_text(report_text: str) -> str | None:
+    """The report's Diagnosis / Final diagnosis / Impression text, so the
+    main finding is never missed just because NER failed to tag it."""
+    return _extract_section_text(report_text, DIAGNOSIS_SECTION_LABELS)
+
+
+def _extract_specimen_text(report_text: str) -> str | None:
+    """The report's Specimen text, so the sample description is never
+    guessed together from mistagged NER entities."""
+    return _extract_section_text(report_text, SPECIMEN_SECTION_LABELS)
+
+
 def narrate_report(report_text: str, entities: list) -> str:
     """Build a flowing plain-language paragraph from detected NER entities and
     glossary terms. Every sentence is grounded in something actually found in
@@ -177,35 +211,43 @@ def narrate_report(report_text: str, entities: list) -> str:
     glossary term."""
     sentences = []
 
-    # 1. Opening: specimen/site, if detected.
-    site = _first_entity_text(entities, report_text, "Biological_structure")
-    procedure = _first_entity_text(
-        entities, report_text, "Diagnostic_procedure"
-    ) or _first_entity_text(entities, report_text, "Therapeutic_procedure")
-    specimen_term = next(
-        (t for t in SPECIMEN_TERMS if GLOSSARY_PATTERNS[t].search(report_text)), None
-    )
-    procedure_phrase = procedure.lower() if procedure else specimen_term
-    if procedure_phrase and site:
-        sentences.append(f"This report is based on a {procedure_phrase} of the {site.lower()}.")
-    elif site:
-        sentences.append(f"This report concerns tissue from the {site.lower()}.")
-    elif procedure_phrase:
-        sentences.append(f"This report is based on a {procedure_phrase}.")
-
-    # 2. Main diagnosis, with its glossary meaning woven into the sentence.
-    diagnosis = _first_entity_text(entities, report_text, "Disease_disorder")
-    if diagnosis:
-        term = _find_glossary_term(diagnosis) or _find_glossary_term(report_text)
+    # 1. Opening: the report's own Diagnosis / Final diagnosis / Impression
+    # text, parsed deterministically (no NER dependency), so the main
+    # finding always appears even if the NER model fails to tag it. This is
+    # authoritative report text, so it's safe to state directly; only the
+    # glossary meaning woven in afterward needs a matched term to back it.
+    diagnosis_text = _extract_diagnosis_text(report_text)
+    if diagnosis_text:
+        sentence = f"According to your report, the diagnosis is: {diagnosis_text}"
+        term = _find_glossary_term(diagnosis_text)
         if term:
-            sentences.append(
-                f"The main finding is {diagnosis.lower()}, which means "
-                f"{_lowercase_first(glossary_short_gloss(term))}."
-            )
-        else:
-            sentences.append(f"The main finding is {diagnosis.lower()}.")
+            sentence += f" In plain terms, {_lowercase_first(glossary_short_gloss(term))}."
+        sentences.append(sentence)
 
-    # 3. Grade / differentiation, in plain terms.
+    # 2. Specimen, parsed deterministically from the report's "Specimen:"
+    # line (same approach as the diagnosis, item 1) rather than assembled
+    # from NER entities, which could mistag the report's title line and
+    # produce broken fragments like "a surgical of the breast". Omitted
+    # entirely if the report has no "Specimen:" line, rather than guessing.
+    specimen_text = _extract_specimen_text(report_text)
+    if specimen_text:
+        sentences.append(f"The sample examined was: {specimen_text}")
+
+    # 3. Main diagnosis via NER -- only as a fallback for reports with no
+    # deterministic Diagnosis/Final diagnosis/Impression section (item 1).
+    if not diagnosis_text:
+        diagnosis_entity = _first_entity_text(entities, report_text, "Disease_disorder")
+        if diagnosis_entity:
+            term = _find_glossary_term(diagnosis_entity) or _find_glossary_term(report_text)
+            if term:
+                sentences.append(
+                    f"The main finding is {diagnosis_entity.lower()}, which means "
+                    f"{_lowercase_first(glossary_short_gloss(term))}."
+                )
+            else:
+                sentences.append(f"The main finding is {diagnosis_entity.lower()}.")
+
+    # 4. Grade / differentiation, in plain terms.
     diff_term = next(
         (t for t in DIFFERENTIATION_TERMS if GLOSSARY_PATTERNS[t].search(report_text)), None
     )
@@ -215,7 +257,7 @@ def narrate_report(report_text: str, entities: list) -> str:
             f"{_lowercase_first(glossary_short_gloss(diff_term))}."
         )
 
-    # 4. Receptor status, in plain terms. Each clause names its receptor so
+    # 5. Receptor status, in plain terms. Each clause names its receptor so
     # near-identical glossary wording (e.g. ER vs. PR) doesn't read as a
     # repeated, unattributed fragment.
     receptor_clauses = [
@@ -230,7 +272,7 @@ def narrate_report(report_text: str, entities: list) -> str:
             joined = ", ".join(receptor_clauses[:-1]) + ", and " + receptor_clauses[-1]
         sentences.append(f"The report also checked receptor status: {joined}.")
 
-    # 5. Closing reminder -- general advice, not a claim about the report.
+    # 6. Closing reminder -- general advice, not a claim about the report.
     sentences.append(
         "As always, share this report with your doctor, who can explain what "
         "it means for your specific care."
