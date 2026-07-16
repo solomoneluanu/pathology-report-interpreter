@@ -329,62 +329,280 @@ if SAMPLES_DIR.exists():
 
 
 # ---------------------------------------------------------------------------
-# 5. Gradio interface
+# 5. Gradio interface -- always-on dark, modern/clinical theme
 # ---------------------------------------------------------------------------
-THEME = gr.themes.Soft(primary_hue="teal", secondary_hue="slate")
+THEME = (
+    gr.themes.Base(
+        primary_hue=gr.themes.colors.teal,
+        neutral_hue=gr.themes.colors.slate,
+        font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+    )
+    .set(
+        # Surfaces. Light and dark variants are set to the SAME dark palette
+        # (rather than relying only on the forced ".dark" class below) so the
+        # UI can never flash or fall back to a light theme.
+        body_background_fill="#0F172A",
+        body_background_fill_dark="#0F172A",
+        background_fill_primary="#0F172A",
+        background_fill_primary_dark="#0F172A",
+        background_fill_secondary="#1E293B",
+        background_fill_secondary_dark="#1E293B",
+        block_background_fill="#1E293B",
+        block_background_fill_dark="#1E293B",
+        panel_background_fill="#1E293B",
+        panel_background_fill_dark="#1E293B",
+        input_background_fill="#0F172A",
+        input_background_fill_dark="#0F172A",
+        # Borders
+        block_border_color="#334155",
+        block_border_color_dark="#334155",
+        border_color_primary="#334155",
+        border_color_primary_dark="#334155",
+        panel_border_color="#334155",
+        panel_border_color_dark="#334155",
+        input_border_color="#334155",
+        input_border_color_dark="#334155",
+        input_border_color_focus="#2DD4BF",
+        input_border_color_focus_dark="#2DD4BF",
+        # Text
+        body_text_color="#F1F5F9",
+        body_text_color_dark="#F1F5F9",
+        body_text_color_subdued="#94A3B8",
+        body_text_color_subdued_dark="#94A3B8",
+        body_text_size="16px",
+        block_label_text_color="#94A3B8",
+        block_label_text_color_dark="#94A3B8",
+        block_title_text_color="#F1F5F9",
+        block_title_text_color_dark="#F1F5F9",
+        # Accent / links
+        color_accent="#2DD4BF",
+        color_accent_soft="rgba(45, 212, 191, 0.15)",
+        color_accent_soft_dark="rgba(45, 212, 191, 0.15)",
+        border_color_accent="#2DD4BF",
+        border_color_accent_dark="#2DD4BF",
+        link_text_color="#2DD4BF",
+        link_text_color_dark="#2DD4BF",
+        link_text_color_hover="#5EEAD4",
+        link_text_color_hover_dark="#5EEAD4",
+        # Buttons -- primary (teal accent)
+        button_primary_background_fill="#2DD4BF",
+        button_primary_background_fill_dark="#2DD4BF",
+        button_primary_background_fill_hover="#5EEAD4",
+        button_primary_background_fill_hover_dark="#5EEAD4",
+        button_primary_border_color="#2DD4BF",
+        button_primary_border_color_dark="#2DD4BF",
+        button_primary_text_color="#0F172A",
+        button_primary_text_color_dark="#0F172A",
+        # Buttons -- secondary (visually lighter/quieter)
+        button_secondary_background_fill="#334155",
+        button_secondary_background_fill_dark="#334155",
+        button_secondary_background_fill_hover="#475569",
+        button_secondary_background_fill_hover_dark="#475569",
+        button_secondary_border_color="#334155",
+        button_secondary_border_color_dark="#334155",
+        button_secondary_text_color="#F1F5F9",
+        button_secondary_text_color_dark="#F1F5F9",
+        # Radii
+        block_radius="12px",
+        container_radius="12px",
+        input_radius="8px",
+        button_large_radius="10px",
+        button_medium_radius="10px",
+        button_small_radius="8px",
+    )
+)
+
+# Forces dark mode regardless of the visitor's OS/browser preference. Belt
+# and suspenders with the identical light/dark palette above: Gradio's own
+# theme CSS is gated behind ":root.dark, :root .dark", and some component
+# internals key off that class too, so it's still added explicitly.
+FORCE_DARK_JS = "() => { document.body.classList.add('dark'); }"
 
 CUSTOM_CSS = """
-#app-title h1 {font-size: 2rem; margin-bottom: 0.2rem;}
-#disclaimer {border-left: 4px solid #e67e22; padding-left: 12px;}
+:root, .dark {
+  --pp-bg: #0F172A;
+  --pp-surface: #1E293B;
+  --pp-border: #334155;
+  --pp-text: #F1F5F9;
+  --pp-muted: #94A3B8;
+  --pp-accent: #2DD4BF;
+  --pp-amber: #F59E0B;
+}
+
+html, body, .gradio-container {
+  background: var(--pp-bg) !important;
+  color: var(--pp-text);
+  font-size: 16px;
+}
+
+/* Let the page scroll naturally instead of trapping content in a small
+   inner scroll region. Gradio's app shell defaults to a fixed-height flex
+   column with overflow:hidden, which pushes any overflow into a nested
+   scrollbar rather than growing the page. */
+html, body {
+  height: auto !important;
+  min-height: 100%;
+}
+.gradio-container,
+[class*="gradio-container"] {
+  overflow: visible !important;
+  height: auto !important;
+  min-height: 100vh;
+}
+
+/* ---- Header band ---- */
+.pp-header { padding: 8px 4px 4px; }
+#app-title h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.15rem;
+  color: var(--pp-text);
+}
+#app-tagline p {
+  color: var(--pp-muted);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  margin-top: 0;
+}
+#disclaimer blockquote {
+  border-left: 4px solid var(--pp-amber);
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 16px 0 0;
+}
+#disclaimer blockquote p {
+  margin: 0;
+  color: var(--pp-text);
+  font-size: 1rem;
+}
+
+/* ---- Cards ---- */
+.pp-card {
+  background: var(--pp-surface) !important;
+  border: 1px solid var(--pp-border) !important;
+  border-radius: 12px !important;
+  padding: 24px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  margin-bottom: 20px;
+}
+#results-heading h2 { margin-top: 0; color: var(--pp-text); }
+
+/* ---- Buttons ---- */
+#analyze-btn button {
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 4px 14px rgba(45, 212, 191, 0.25);
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+#analyze-btn button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+#analyze-btn button:active { transform: translateY(0); }
+
+#ocr-btn button {
+  background: transparent !important;
+  border: 1px solid var(--pp-border) !important;
+  color: var(--pp-muted) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+#ocr-btn button:hover {
+  background: rgba(148, 163, 184, 0.1) !important;
+  color: var(--pp-text) !important;
+}
+
+/* ---- HighlightedText legend as rounded pill/chips. Gradio doesn't expose
+   stable public class names for this internal markup, so these are
+   deliberately broad, best-effort selectors. ---- */
+#hl-output .categories,
+#hl-output [class*="legend" i],
+#hl-output [class*="categor" i] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+#hl-output .categories > *,
+#hl-output [class*="legend" i] > *,
+#hl-output [class*="categor" i] > * {
+  border-radius: 9999px !important;
+  padding: 4px 14px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  border: 1px solid var(--pp-border) !important;
+}
+
+/* ---- Accessibility ---- */
+*:focus-visible {
+  outline: 2px solid var(--pp-accent) !important;
+  outline-offset: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 """
 
-with gr.Blocks(theme=THEME, css=CUSTOM_CSS, title="PathPal - Pathology Report Interpreter") as demo:
-    gr.Markdown(
-        "# 🔬 PathPal — Pathology Report Interpreter\n"
-        "Paste your pathology report (or upload a photo of it) and PathPal will "
-        "**highlight the medical terms**, give you a **plain-language explanation**, "
-        "and **explain common jargon** — so you can walk into your next "
-        "appointment with better questions.",
-        elem_id="app-title",
-    )
-    gr.Markdown(DISCLAIMER_MD, elem_id="disclaimer")
+with gr.Blocks(title="PathPal - Pathology Report Interpreter") as demo:
+    with gr.Column(elem_classes=["pp-header"]):
+        gr.Markdown("# 🔬 PathPal — Pathology Report Interpreter", elem_id="app-title")
+        gr.Markdown(
+            "Paste your pathology report (or upload a photo of it) and PathPal will "
+            "**highlight the medical terms**, give you a **plain-language explanation**, "
+            "and **explain common jargon** — so you can walk into your next "
+            "appointment with better questions.",
+            elem_id="app-tagline",
+        )
+        gr.Markdown(DISCLAIMER_MD, elem_id="disclaimer")
 
-    with gr.Tabs():
-        # ------------------------- TAB 1: paste text -----------------------
-        with gr.Tab("📋 Paste report text"):
-            report_input = gr.Textbox(
-                label="Pathology report text",
-                placeholder="Paste the full text of the pathology report here...",
-                lines=12,
-            )
-            analyze_btn = gr.Button("Explain my report", variant="primary")
+    with gr.Column(elem_classes=["pp-card"]):
+        with gr.Tabs():
+            # --------------------- TAB 1: paste text ------------------------
+            with gr.Tab("📋 Paste report text"):
+                report_input = gr.Textbox(
+                    label="Pathology report text",
+                    placeholder="Paste the full text of the pathology report here...",
+                    lines=18,
+                )
+                analyze_btn = gr.Button(
+                    "Explain my report", variant="primary", elem_id="analyze-btn"
+                )
 
-        # --------------------- TAB 2: photo upload (OCR) -------------------
-        with gr.Tab("📷 Upload a photo of the report (multimodal)"):
-            gr.Markdown(
-                "Take a clear, well-lit photo of the printed report, straight-on. "
-                "The extracted text will appear in the box on the left tab — "
-                "review it for OCR errors, then click **Explain my report**."
-            )
-            image_input = gr.Image(
-                label="Photo or scan of the printed report", type="pil"
-            )
-            ocr_btn = gr.Button("Read text from photo", variant="secondary")
+            # ----------------- TAB 2: photo upload (OCR) --------------------
+            with gr.Tab("📷 Upload a photo of the report (multimodal)"):
+                gr.Markdown(
+                    "Take a clear, well-lit photo of the printed report, straight-on. "
+                    "The extracted text will appear in the box on the left tab — "
+                    "review it for OCR errors, then click **Explain my report**."
+                )
+                image_input = gr.Image(
+                    label="Photo or scan of the printed report", type="pil"
+                )
+                ocr_btn = gr.Button(
+                    "Read text from photo", variant="secondary", elem_id="ocr-btn"
+                )
 
-    gr.Markdown("## Results")
-    with gr.Row():
-        with gr.Column(scale=3):
-            highlighted_output = gr.HighlightedText(
-                label="Your report with medical terms highlighted",
-                combine_adjacent=True,
-                show_legend=True,
-            )
-        with gr.Column(scale=2):
-            summary_output = gr.Textbox(
-                label="What this report means (plain-language explanation)",
-                lines=6,
-            )
-    glossary_output = gr.Markdown(label="Glossary of terms found in your report")
+    with gr.Column(elem_classes=["pp-card"]):
+        gr.Markdown("## Results", elem_id="results-heading")
+        with gr.Row():
+            with gr.Column(scale=3):
+                highlighted_output = gr.HighlightedText(
+                    label="Your report with medical terms highlighted",
+                    combine_adjacent=True,
+                    show_legend=True,
+                    elem_id="hl-output",
+                )
+            with gr.Column(scale=2):
+                summary_output = gr.Textbox(
+                    label="What this report means (plain-language explanation)",
+                    lines=6,
+                )
+        glossary_output = gr.Markdown(label="Glossary of terms found in your report")
 
     if EXAMPLES:
         gr.Examples(
@@ -414,4 +632,4 @@ with gr.Blocks(theme=THEME, css=CUSTOM_CSS, title="PathPal - Pathology Report In
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(theme=THEME, css=CUSTOM_CSS, js=FORCE_DARK_JS)
