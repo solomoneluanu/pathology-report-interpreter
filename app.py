@@ -548,7 +548,12 @@ html, body {
 }
 """
 
-with gr.Blocks(title="PathPal - Pathology Report Interpreter") as demo:
+with gr.Blocks(
+    title="PathPal - Pathology Report Interpreter",
+    theme=THEME,
+    css=CUSTOM_CSS,
+    js=FORCE_DARK_JS,
+) as demo:
     with gr.Column(elem_classes=["pp-header"]):
         gr.Markdown("# 🔬 PathPal — Pathology Report Interpreter", elem_id="app-title")
         gr.Markdown(
@@ -632,4 +637,4 @@ with gr.Blocks(title="PathPal - Pathology Report Interpreter") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(theme=THEME, css=CUSTOM_CSS, js=FORCE_DARK_JS)
+    demo.launch()
