@@ -119,9 +119,7 @@ node, cervix, stomach, kidney, bladder, liver, endometrium, bone marrow and
 pancreas.
 
 **Metrics.** NER is a labelling task, so classification metrics are used —
-precision, recall (sensitivity) and F1. Text-overlap metrics such as BLEU
-(translation) and ROUGE (summarisation) do not apply, because the model tags
-spans rather than generating text.
+precision, recall (sensitivity) and F1. 
 
 **Matching.** Entities are compared by **character offsets**, which avoids
 artefacts from punctuation and sub-word tokenisation. Two modes are reported:
@@ -262,4 +260,4 @@ pathology-report-interpreter/
 **Solomon Tessega**
 
 Individual course project — Transformer-Based Application using Gradio and
-Hugging Face Spaces. All implementation and writing are my own work.
+Hugging Face Spaces.
